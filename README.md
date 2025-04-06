@@ -14,8 +14,6 @@ Our architecture implements defense-in-depth through three distinct security zon
 
 Each zone is protected by dedicated firewalls, and all traffic is monitored by Suricata IDS.
 
-![Network Architecture Diagram](network_diagram.png)
-
 ## Components
 
 ### Network Infrastructure
@@ -87,12 +85,10 @@ Our implementation demonstrated several important security principles:
 3. Execute traffic generation scripts for testing
 4. View alerts in Suricata logs or Kibana dashboard
 
-# =====================================================
-# DEMONSTRATION COMMANDS FOR LAYERED SECURITY WITH IDS
-# =====================================================
+## Demonstration Commands
 
-# 1. CHECKING ENVIRONMENT STATUS
-# -----------------------------
+### 1. Checking Environment Status
+```bash
 # View all running containers
 docker ps
 
@@ -100,9 +96,10 @@ docker ps
 docker network ls
 docker network inspect security_lab_new_external_net
 docker network inspect security_lab_new_internal_net
+```
 
-# 2. EXAMINING SURICATA CONFIGURATION
-# ----------------------------------
+### 2. Examining Suricata Configuration
+```bash
 # Check Suricata rules
 docker exec -it suricata sh -c "ls -la /etc/suricata/rules/"
 
@@ -115,18 +112,20 @@ docker exec -it suricata sh -c "ps aux | grep suricata"
 
 # Validate Suricata configuration
 docker exec -it suricata sh -c "suricata -c /etc/suricata/suricata.yaml -T"
+```
 
-# 3. NETWORK CONNECTIVITY TESTS
-# ----------------------------
+### 3. Network Connectivity Tests
+```bash
 # Test basic connectivity
 docker exec -it traffic_generator ping -c 3 webserver
 docker exec -it traffic_generator curl -s http://webserver/
 
 # Test connectivity to internal network
 docker exec -it traffic_generator ping -c 3 database
+```
 
-# 4. ATTACK SIMULATION
-# ------------------
+### 4. Attack Simulation
+```bash
 # Run comprehensive traffic generation
 docker exec -it traffic_generator sh /scripts/generate_traffic.sh
 
@@ -149,9 +148,10 @@ docker exec -it traffic_generator sh -c "for i in {1..10}; do echo \"Login attem
 
 # DoS simulation (light version)
 docker exec -it traffic_generator sh -c "for i in {1..50}; do curl -s http://webserver/ > /dev/null & sleep 0.1; done"
+```
 
-# 5. MONITORING FOR ALERTS
-# ----------------------
+### 5. Monitoring for Alerts
+```bash
 # Check alert logs
 docker exec -it suricata sh -c "cat /var/log/suricata/fast.log"
 
@@ -163,9 +163,10 @@ docker exec -it suricata sh -c "tail -f /var/log/suricata/fast.log"
 
 # List all log files
 docker exec -it suricata sh -c "ls -la /var/log/suricata/"
+```
 
-# 6. FIREWALL CONFIGURATION
-# -----------------------
+### 6. Firewall Configuration
+```bash
 # View external firewall rules
 docker exec -it external_firewall sh -c "iptables -L -n -v"
 
@@ -180,16 +181,18 @@ docker exec -it external_firewall sh -c "iptables -A FORWARD -p tcp --syn -m lim
 
 # Protect internal network
 docker exec -it internal_firewall sh -c "iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 3306 -s 172.18.0.3 -j ACCEPT && iptables -A FORWARD -i eth0 -o eth1 -j DROP"
+```
 
-# 7. KIBANA DASHBOARD (If Accessible)
-# ---------------------------------
+### 7. Kibana Dashboard (If Accessible)
+```bash
 # Check if Kibana is running
 curl -I http://localhost:5601
 
 # Access in browser: http://localhost:5601
+```
 
-# 8. RULE TUNING DEMONSTRATION
-# --------------------------
+### 8. Rule Tuning Demonstration
+```bash
 # Modify rule threshold to reduce false positives
 docker exec -it suricata sh -c "sed -i 's/count 20, seconds 60/count 50, seconds 60/' /etc/suricata/rules/port-scan.rules"
 
@@ -198,28 +201,14 @@ docker exec -it suricata sh -c "kill -USR2 \$(pidof suricata) || docker restart 
 
 # Verify the changed rule
 docker exec -it suricata sh -c "grep count /etc/suricata/rules/port-scan.rules"
+```
 
-# 9. WEB SERVER CONFIGURATION
-# -------------------------
+### 9. Web Server Configuration
+```bash
 # View web server configuration
 docker exec -it webserver sh -c "cat /etc/nginx/conf.d/default.conf"
 
 # Add security headers (simulated change)
 docker exec -it webserver sh -c "echo 'add_header X-XSS-Protection \"1; mode=block\";' > /tmp/headers.conf"
+```
 
-# 10. CLEAN UP (After Demonstration)
-# -------------------------------
-# Stop all containers
-# docker-compose down
-
-## Documentation
-
-For complete details, please refer to the comprehensive documentation PDF included in this repository, which contains:
-
-- Detailed installation and configuration steps
-- IDS rule configurations and explanations
-- Traffic simulation methods
-- Alert analysis procedures
-- Incident investigation examples
-- Preventive security measures
-- Performance optimizations and rule tuning
