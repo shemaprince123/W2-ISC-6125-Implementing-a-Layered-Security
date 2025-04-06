@@ -1,0 +1,16 @@
+# Basic detection rules for security lab
+
+# Network scanning detection
+alert icmp any any -> any any (msg:"SCAN: ICMP Ping"; sid:1000001; rev:1;)
+alert tcp any any -> any any (msg:"SCAN: TCP Port Scan"; flags:S; threshold:type threshold, track by_src, count 20, seconds 60; sid:1000002; rev:1;)
+
+# Web attacks
+alert http any any -> any any (msg:"WEB: SQL Injection Attempt"; flow:established,to_server; content:"union"; nocase; http_uri; sid:1000003; rev:1;)
+alert http any any -> any any (msg:"WEB: XSS Attempt"; flow:established,to_server; content:"<script>"; nocase; http_uri; sid:1000004; rev:1;)
+alert http any any -> any any (msg:"WEB: Path Traversal"; flow:established,to_server; content:"../"; http_uri; sid:1000005; rev:1;)
+
+# Brute force detection
+alert http any any -> any any (msg:"BRUTE FORCE: HTTP Login Attempt"; flow:established,to_server; content:"POST"; http_method; content:"login"; http_uri; threshold:type threshold, track by_src, count 5, seconds 30; sid:1000006; rev:1;)
+
+# DoS detection
+alert tcp any any -> any any (msg:"DOS: TCP SYN Flood"; flags:S; flow:stateless; threshold:type both, track by_dst, count 50, seconds 5; sid:1000007; rev:1;)

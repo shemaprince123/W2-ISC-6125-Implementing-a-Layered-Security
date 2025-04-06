@@ -1,0 +1,134 @@
+version: '3'
+
+networks:
+  external_net:
+    driver: bridge
+  internal_net:
+    driver: bridge
+    internal: false
+
+services:
+  # External zone (DMZ) services
+  webserver:
+    image: nginx:alpine
+    container_name: webserver
+    networks:
+      - external_net
+    ports:
+      - "8080:80"
+    volumes:
+      - ./web_content:/usr/share/nginx/html
+  
+  mailserver:
+    image: bytemark/smtp:latest
+    container_name: mailserver
+    networks:
+      - external_net
+    ports:
+      - "1025:25"
+  
+  # Internal zone services
+  database:
+    image: mariadb:latest
+    container_name: database
+    networks:
+      - internal_net
+    environment:
+      MYSQL_ROOT_PASSWORD: securepassword
+      MYSQL_DATABASE: testdb
+      MYSQL_USER: testuser
+      MYSQL_PASSWORD: testpass
+  
+  client:
+    image: alpine:latest
+    container_name: client
+    networks:
+      - internal_net
+      - external_net
+    command: tail -f /dev/null
+  
+  # Firewall containers (simplified with Alpine)
+  external_firewall:
+    image: alpine:latest
+    container_name: external_firewall
+    networks:
+      - external_net
+    cap_add:
+      - NET_ADMIN
+    command: sh -c "apk add --no-cache iptables && tail -f /dev/null"
+  
+  internal_firewall:
+    image: alpine:latest
+    container_name: internal_firewall
+    networks:
+      - external_net
+      - internal_net
+    cap_add:
+      - NET_ADMIN
+    command: sh -c "apk add --no-cache iptables && tail -f /dev/null"
+  
+  # Using Suricata directly instead of Security Onion
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: suricata
+    networks:
+      - external_net
+      - internal_net
+    volumes:
+      - ./suricata/rules:/etc/suricata/rules
+      - ./suricata/logs:/var/log/suricata
+    environment:
+      - SURICATA_OPTIONS=-i eth0
+    cap_add:
+      - NET_ADMIN
+      - SYS_NICE
+      - NET_RAW
+  
+  # Adding ELK stack for log visualization
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.16.3
+    container_name: elasticsearch
+    networks:
+      - internal_net
+    environment:
+      - discovery.type=single-node
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - ./elasticsearch_data:/usr/share/elasticsearch/data
+  
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.16.3
+    container_name: kibana
+    networks:
+      - internal_net
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+  
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.16.3
+    container_name: logstash
+    networks:
+      - internal_net
+    depends_on:
+      - elasticsearch
+    volumes:
+      - ./logstash/config:/etc/logstash/conf.d
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+  
+  # Traffic generator for testing
+  traffic_generator:
+    image: alpine:latest
+    container_name: traffic_generator
+    networks:
+      - external_net
+      - internal_net
+    volumes:
+      - ./scripts:/scripts
+    command: sh -c "apk add --no-cache curl nmap && tail -f /dev/null"
