@@ -87,6 +87,131 @@ Our implementation demonstrated several important security principles:
 3. Execute traffic generation scripts for testing
 4. View alerts in Suricata logs or Kibana dashboard
 
+# =====================================================
+# DEMONSTRATION COMMANDS FOR LAYERED SECURITY WITH IDS
+# =====================================================
+
+# 1. CHECKING ENVIRONMENT STATUS
+# -----------------------------
+# View all running containers
+docker ps
+
+# View network configuration
+docker network ls
+docker network inspect security_lab_new_external_net
+docker network inspect security_lab_new_internal_net
+
+# 2. EXAMINING SURICATA CONFIGURATION
+# ----------------------------------
+# Check Suricata rules
+docker exec -it suricata sh -c "ls -la /etc/suricata/rules/"
+
+# View rule content
+docker exec -it suricata sh -c "cat /etc/suricata/rules/local.rules"
+docker exec -it suricata sh -c "cat /etc/suricata/rules/port-scan.rules"
+
+# Check if Suricata is running correctly
+docker exec -it suricata sh -c "ps aux | grep suricata"
+
+# Validate Suricata configuration
+docker exec -it suricata sh -c "suricata -c /etc/suricata/suricata.yaml -T"
+
+# 3. NETWORK CONNECTIVITY TESTS
+# ----------------------------
+# Test basic connectivity
+docker exec -it traffic_generator ping -c 3 webserver
+docker exec -it traffic_generator curl -s http://webserver/
+
+# Test connectivity to internal network
+docker exec -it traffic_generator ping -c 3 database
+
+# 4. ATTACK SIMULATION
+# ------------------
+# Run comprehensive traffic generation
+docker exec -it traffic_generator sh /scripts/generate_traffic.sh
+
+# Specific attack simulations:
+
+# Port scan attack
+docker exec -it traffic_generator nmap -sS webserver
+
+# SQL injection attack
+docker exec -it traffic_generator curl "http://webserver/search?query=1%27%20union%20select%20*%20from%20users--"
+
+# XSS attack
+docker exec -it traffic_generator curl "http://webserver/page?data=<script>alert(1)</script>"
+
+# Path traversal attack
+docker exec -it traffic_generator curl "http://webserver/include?file=../../../etc/passwd"
+
+# Brute force login
+docker exec -it traffic_generator sh -c "for i in {1..10}; do echo \"Login attempt $i\"; curl -s -X POST http://webserver/login -d \"username=admin&password=test$i\"; done"
+
+# DoS simulation (light version)
+docker exec -it traffic_generator sh -c "for i in {1..50}; do curl -s http://webserver/ > /dev/null & sleep 0.1; done"
+
+# 5. MONITORING FOR ALERTS
+# ----------------------
+# Check alert logs
+docker exec -it suricata sh -c "cat /var/log/suricata/fast.log"
+
+# Check JSON alert details
+docker exec -it suricata sh -c "grep -A 10 'alert' /var/log/suricata/eve.json"
+
+# Monitor logs in real-time
+docker exec -it suricata sh -c "tail -f /var/log/suricata/fast.log"
+
+# List all log files
+docker exec -it suricata sh -c "ls -la /var/log/suricata/"
+
+# 6. FIREWALL CONFIGURATION
+# -----------------------
+# View external firewall rules
+docker exec -it external_firewall sh -c "iptables -L -n -v"
+
+# View internal firewall rules
+docker exec -it internal_firewall sh -c "iptables -L -n -v"
+
+# Add port scanning protection to external firewall
+docker exec -it external_firewall sh -c "iptables -A FORWARD -p tcp -m recent --name portscan --seconds 60 --hitcount 20 -j DROP"
+
+# Add SYN flood protection
+docker exec -it external_firewall sh -c "iptables -A FORWARD -p tcp --syn -m limit --limit 1/s --limit-burst 3 -j ACCEPT && iptables -A FORWARD -p tcp --syn -j DROP"
+
+# Protect internal network
+docker exec -it internal_firewall sh -c "iptables -A FORWARD -i eth0 -o eth1 -p tcp --dport 3306 -s 172.18.0.3 -j ACCEPT && iptables -A FORWARD -i eth0 -o eth1 -j DROP"
+
+# 7. KIBANA DASHBOARD (If Accessible)
+# ---------------------------------
+# Check if Kibana is running
+curl -I http://localhost:5601
+
+# Access in browser: http://localhost:5601
+
+# 8. RULE TUNING DEMONSTRATION
+# --------------------------
+# Modify rule threshold to reduce false positives
+docker exec -it suricata sh -c "sed -i 's/count 20, seconds 60/count 50, seconds 60/' /etc/suricata/rules/port-scan.rules"
+
+# Restart Suricata to apply changes
+docker exec -it suricata sh -c "kill -USR2 \$(pidof suricata) || docker restart suricata"
+
+# Verify the changed rule
+docker exec -it suricata sh -c "grep count /etc/suricata/rules/port-scan.rules"
+
+# 9. WEB SERVER CONFIGURATION
+# -------------------------
+# View web server configuration
+docker exec -it webserver sh -c "cat /etc/nginx/conf.d/default.conf"
+
+# Add security headers (simulated change)
+docker exec -it webserver sh -c "echo 'add_header X-XSS-Protection \"1; mode=block\";' > /tmp/headers.conf"
+
+# 10. CLEAN UP (After Demonstration)
+# -------------------------------
+# Stop all containers
+# docker-compose down
+
 ## Documentation
 
 For complete details, please refer to the comprehensive documentation PDF included in this repository, which contains:
